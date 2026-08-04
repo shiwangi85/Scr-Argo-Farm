@@ -365,7 +365,7 @@ const ProductDetail = () => {
           // If already a full URL, return as is
           if (url.startsWith('http')) return url;
           // If it's a relative path, build the full public URL
-          return `https://xmkefhhhsslwceuvjiwb.supabase.co/storage/v1/object/public/product-images/${url.replace(/^\/?reviews\//, 'reviews/')}`;
+          return `https://xmkefhhhsslwceuvjiwb.supabase.co/storage/v1/object/product-images/${url.replace(/^\/?reviews\//, 'reviews/')}`;
         }
         // If object, try to extract url/publicUrl
         return url?.publicUrl || url?.url || '';

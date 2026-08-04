@@ -12,9 +12,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { CheckCircle, ChevronDown, ChevronUp, Clock, Package, Truck, XCircle, Star } from 'lucide-react';
+import {
+  CheckCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Package,
+  Truck,
+  XCircle,
+  Star,
+  ShoppingCart
+} from 'lucide-react';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -93,6 +104,8 @@ interface Order {
 const Orders: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+const { toast } = useToast();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
   const [selectedOtp, setSelectedOtp] = useState<string | null>(null);
   const [showOtpModal, setShowOtpModal] = useState(false);
@@ -221,6 +234,67 @@ const Orders: React.FC = () => {
       alert("Failed to submit review.");
     }
   };
+  const reorderMutation = useMutation({
+  mutationFn: async (order: Order) => {
+    if (!user) throw new Error("Login required");
+
+    for (const item of order.order_items) {
+
+      const { data: existing } = await supabase
+        .from("cart_items")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("product_id", item.product_id)
+        .maybeSingle();
+
+      if (existing) {
+
+        await supabase
+          .from("cart_items")
+          .update({
+            quantity: existing.quantity + item.quantity,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", existing.id);
+
+      } else {
+
+        await supabase
+          .from("cart_items")
+          .insert({
+            user_id: user.id,
+            product_id: item.product_id,
+            quantity: item.quantity
+          });
+
+      }
+    }
+  },
+
+  onSuccess: () => {
+
+    queryClient.invalidateQueries({
+      queryKey: ["cart"]
+    });
+
+    toast({
+      title: "Reordered Successfully",
+      description: "Products added to cart."
+    });
+
+     navigate("/cart");
+  },
+
+  onError: (error: any) => {
+
+    toast({
+      title: "Error",
+      description: error.message,
+      variant: "destructive"
+    });
+
+  }
+});
 
   // Fetch product details separately if needed
   const { data: products } = useQuery({
@@ -337,6 +411,14 @@ const Orders: React.FC = () => {
                           {order.delivery_otp ? 'View OTP' : 'OTP pending'}
                         </Button>
                       )}
+                      <Button
+    size="sm"
+    className="bg-green-600 hover:bg-green-700 text-white"
+    onClick={() => reorderMutation.mutate(order)}
+>
+    <ShoppingCart className="w-4 h-4 mr-2" />
+    Reorder
+</Button>
                       <Button
                         variant="ghost"
                         size="sm"
